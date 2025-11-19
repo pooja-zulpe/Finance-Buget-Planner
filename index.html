@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Finance Tracker</title>
+        <style>
+            :root{
+                --bg:#f5f7fb;
+                --card:#ffffff;
+                --muted:#6b7280;
+                --accent:#2563eb;
+                --income:#16a34a;
+                --expense:#ef4444;
+                --glass: rgba(255,255,255,0.6);
+                font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+                color-scheme: light;
+            }
+            *{box-sizing:border-box}
+            html,body{height:100%}
+            body{
+                margin:0;
+                background:linear-gradient(180deg,#eef2ff 0%, var(--bg) 100%);
+                padding:20px;
+                -webkit-font-smoothing:antialiased;
+            }
+            .container{
+                max-width:1100px;
+                margin:0 auto;
+                display:grid;
+                grid-template-columns: 1fr 360px;
+                gap:20px;
+                align-items:start;
+            }
+            header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;margin-bottom:4px}
+            h1{font-size:1.25rem;margin:0}
+            .subtitle{color:var(--muted);font-size:0.9rem}
+
+            /* Left column */
+            .main-card{background:var(--card);border-radius:12px;padding:18px;box-shadow:0 6px 20px rgba(2,6,23,0.06)}
+            .summary{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+            .tile{flex:1;min-width:160px;background:linear-gradient(180deg,rgba(255,255,255,0.6),var(--card));padding:12px;border-radius:10px}
+            .tile.small{padding:10px}
+            .tile h3{margin:0;font-size:0.85rem;color:var(--muted)}
+            .tile p{margin:6px 0 0;font-size:1.2rem;font-weight:700}
+            .income{color:var(--income)}
+            .expense{color:var(--expense)}
+
+            form.add-transaction{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+            input[type='text'],input[type='number'],select{flex:1;padding:10px;border-radius:8px;border:1px solid #e6e9ef;background:transparent}
+            button{background:var(--accent);color:#fff;border:0;padding:10px 14px;border-radius:8px;cursor:pointer}
+            button.ghost{background:transparent;color:var(--muted);border:1px solid #e6e9ef}
+
+            .transactions{margin-top:16px}
+            .tx{display:flex;justify-content:space-between;padding:10px;border-radius:8px;border:1px solid #f0f2f7;background:linear-gradient(180deg,#fff,#fbfdff);margin-bottom:8px}
+            .tx .left{display:flex;gap:12px;align-items:center}
+            .badge{width:44px;height:44px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:var(--glass);font-weight:600}
+            .tx .desc{font-weight:600}
+            .tx .meta{color:var(--muted);font-size:0.85rem}
+            .tx .amount{font-weight:700}
+            .tx .del{background:transparent;border:0;color:var(--muted);cursor:pointer}
+
+            /* Right column */
+            .sidebar{display:flex;flex-direction:column;gap:12px}
+            .chart-card{background:var(--card);padding:16px;border-radius:12px;box-shadow:0 6px 20px rgba(2,6,23,0.04)}
+            canvas{width:100%!important;height:auto!important}
+
+            .controls{display:flex;gap:8px;flex-wrap:wrap}
+
+            footer.help{grid-column:1/-1;margin-top:12px;color:var(--muted);font-size:0.9rem}
+
+            @media (max-width:900px){
+                .container{grid-template-columns:1fr;}
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <header>
+                <div>
+                    <h1>Finance Tracker</h1>
+                    <div class="subtitle">Track income, expenses and stay on budget — local only</div>
+                </div>
+                <div style="text-align:right">
+                    <div style="font-weight:700">Local changes only</div>
+                    <div class="subtitle">Data saved in your browser</div>
+                </div>
+            </header>
+
+            <section class="main-card">
+                <div class="summary">
+                    <div class="tile">
+                        <h3>Balance</h3>
+                        <p id="balance">$0.00</p>
+                    </div>
+                    <div class="tile small">
+                        <h3>Income</h3>
+                        <p id="income" class="income">$0.00</p>
+                    </div>
+                    <div class="tile small">
+                        <h3>Expenses</h3>
+                        <p id="expense" class="expense">$0.00</p>
+                    </div>
+                </div>
+
+                <div style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap">
+                    <form id="txForm" class="add-transaction" onsubmit="return false;" style="flex:1;min-width:260px">
+                        <input id="desc" type="text" placeholder="Description (e.g., Groceries)" required />
+                        <input id="amount" type="number" placeholder="Amount (positive for income, negative for expense)" step="0.01" required />
+                        <select id="category">
+                            <option value="general">General</option>
+                            <option value="food">Food</option>
+                            <option value="salary">Salary</option>
+                            <option value="bills">Bills</option>
+                            <option value="entertainment">Entertainment</option>
+                        </select>
+                        <div style="display:flex;gap:8px">
+                            <button id="addBtn">Add</button>
+                            <button id="sampleBtn" class="ghost">Add sample</button>
+                            <button id="clearBtn" class="ghost">Clear all</button>
+                        </div>
+                    </form>
+
+                    <div style="flex:1;min-width:320px">
+                        <div style="display:flex;justify-content:space-between;align-items:center">
+                            <h3 style="margin:0">Transactions</h3>
+                            <div class="subtitle">Newest first</div>
+                        </div>
+                        <div class="transactions" id="txList">
+                            <!-- transactions appear here -->
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <aside class="sidebar">
+                <div class="chart-card">
+                    <h3 style="margin:0 0 8px 0">Income vs Expenses</h3>
+                    <canvas id="donut" width="300" height="200"></canvas>
+                </div>
+                <div class="chart-card">
+                    <h3 style="margin:0 0 8px 0">Quick actions</h3>
+                    <div class="controls">
+                        <button id="exportBtn" class="ghost">Export JSON</button>
+                        <button id="importBtn" class="ghost">Import JSON</button>
+                        <input id="fileInput" type="file" accept="application/json" style="display:none" />
+                    </div>
+                </div>
+            </aside>
+
+            <footer class="help">Tip: Use positive amounts for income, negative for expenses (or use negative values). Resize the window to see the responsive layout.</footer>
+        </div>
+
+        <script>
+            // Basic finance tracker (single-file)
+            const LS_KEY = 'ft_transactions_v1';
+
+            // Elements
+            const balanceEl = document.getElementById('balance');
+            const incomeEl = document.getElementById('income');
+            const expenseEl = document.getElementById('expense');
+            const txListEl = document.getElementById('txList');
+            const descInput = document.getElementById('desc');
+            const amountInput = document.getElementById('amount');
+            const categoryInput = document.getElementById('category');
+            const addBtn = document.getElementById('addBtn');
+            const clearBtn = document.getElementById('clearBtn');
+            const sampleBtn = document.getElementById('sampleBtn');
+            const donut = document.getElementById('donut');
+            const exportBtn = document.getElementById('exportBtn');
+            const importBtn = document.getElementById('importBtn');
+            const fileInput = document.getElementById('fileInput');
+
+            let transactions = loadTransactions();
+
+            function saveTransactions(){
+                localStorage.setItem(LS_KEY, JSON.stringify(transactions));
+            }
+
+            function loadTransactions(){
+                try{
+                    const raw = localStorage.getItem(LS_KEY);
+                    return raw ? JSON.parse(raw) : [];
+                }catch(e){
+                    console.error('Failed to parse transactions', e);
+                    return [];
+                }
+            }
+
+            function addTransaction(desc, amount, category){
+                const tx = {id: Date.now(), desc: desc.trim(), amount: Number(amount), category, date: new Date().toISOString()};
+                transactions.unshift(tx); // newest first
+                saveTransactions();
+                render();
+            }
+
+            function removeTransaction(id){
+                transactions = transactions.filter(t => t.id !== id);
+                saveTransactions();
+                render();
+            }
+
+            function clearAll(){
+                if(!confirm('Clear all transactions? This cannot be undone.')) return;
+                transactions = [];
+                saveTransactions();
+                render();
+            }
+
+            function formatCurrency(v){
+                const sign = v<0 ? '-' : '';
+                return sign + '$' + Math.abs(v).toFixed(2);
+            }
+
+            function calcTotals(){
+                let income = 0, expense = 0;
+                for(const t of transactions){
+                    if(t.amount >= 0) income += t.amount;
+                    else expense += Math.abs(t.amount);
+                }
+                const balance = income - expense;
+                return {income, expense, balance};
+            }
+
+            function render(){
+                // totals
+                const {income, expense, balance} = calcTotals();
+                balanceEl.textContent = formatCurrency(balance);
+                incomeEl.textContent = formatCurrency(income);
+                expenseEl.textContent = formatCurrency(expense);
+
+                // tx list
+                txListEl.innerHTML = '';
+                if(transactions.length === 0){
+                    txListEl.innerHTML = '<div class="subtitle">No transactions yet — add one above.</div>';
+                } else {
+                    for(const t of transactions){
+                        const div = document.createElement('div');
+                        div.className = 'tx';
+
+                        const left = document.createElement('div'); left.className = 'left';
+                        const badge = document.createElement('div'); badge.className = 'badge'; badge.textContent = t.category[0]?.toUpperCase()||'?';
+                        const info = document.createElement('div');
+                        const desc = document.createElement('div'); desc.className = 'desc'; desc.textContent = t.desc;
+                        const meta = document.createElement('div'); meta.className = 'meta'; meta.textContent = new Date(t.date).toLocaleString();
+                        info.appendChild(desc); info.appendChild(meta);
+                        left.appendChild(badge); left.appendChild(info);
+
+                        const right = document.createElement('div'); right.style.display='flex'; right.style.alignItems='center'; right.style.gap='12px';
+                        const amount = document.createElement('div'); amount.className = 'amount'; amount.textContent = formatCurrency(t.amount);
+                        amount.style.color = t.amount >= 0 ? 'var(--income)' : 'var(--expense)';
+                        const del = document.createElement('button'); del.className = 'del'; del.textContent = 'Remove'; del.onclick = ()=> removeTransaction(t.id);
+                        right.appendChild(amount); right.appendChild(del);
+
+                        div.appendChild(left); div.appendChild(right);
+                        txListEl.appendChild(div);
+                    }
+                }
+
+                drawDonut(income, expense);
+            }
+
+            // Simple donut chart using canvas (no libs)
+            function drawDonut(income, expense){
+                const ctx = donut.getContext('2d');
+                const w = donut.width, h = donut.height;
+                ctx.clearRect(0,0,w,h);
+                const total = income + expense || 1;
+                const r = Math.min(w,h)/2 - 10;
+                const cx = w/2, cy = h/2;
+
+                let start = -Math.PI/2;
+                const inc = (income/total) * Math.PI*2;
+                // income slice
+                ctx.beginPath();
+                ctx.moveTo(cx,cy);
+                ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--income') || '#16a34a';
+                ctx.arc(cx,cy,r,start,start+inc);
+                ctx.closePath(); ctx.fill();
+                start += inc;
+                // expense slice
+                ctx.beginPath();
+                ctx.moveTo(cx,cy);
+                ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--expense') || '#ef4444';
+                ctx.arc(cx,cy,r,start,start + (expense/total)*Math.PI*2);
+                ctx.closePath(); ctx.fill();
+
+                // hole
+                ctx.beginPath(); ctx.fillStyle = 'rgba(255,255,255,1)'; ctx.arc(cx,cy,r*0.55,0,Math.PI*2); ctx.fill();
+
+                // labels
+                ctx.fillStyle = '#111827'; ctx.font = '14px system-ui'; ctx.textAlign='center';
+                ctx.fillText('Income', cx - 60, cy + r + 16);
+                ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--income'); ctx.fillText(formatCurrency(income), cx - 60, cy + r + 34);
+                ctx.fillStyle = '#111827'; ctx.fillText('Expense', cx + 60, cy + r + 16);
+                ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--expense'); ctx.fillText(formatCurrency(expense), cx + 60, cy + r + 34);
+            }
+
+            // Event handlers
+            addBtn.addEventListener('click', ()=>{
+                const d = descInput.value;
+                const a = parseFloat(amountInput.value);
+                const c = categoryInput.value;
+                if(!d || isNaN(a)){
+                    alert('Please provide a valid description and amount.');
+                    return;
+                }
+                addTransaction(d,a,c);
+                descInput.value=''; amountInput.value=''; categoryInput.value='general';
+                descInput.focus();
+            });
+
+            sampleBtn.addEventListener('click', (e)=>{
+                e.preventDefault();
+                const samples = [
+                    ['Salary',2500,'salary'],
+                    ['Groceries',-95.2,'food'],
+                    ['Electricity Bill',-60,'bills'],
+                    ['Side gig',300,'salary'],
+                    ['Movie',-12,'entertainment']
+                ];
+                for(const s of samples) addTransaction(s[0],s[1],s[2]);
+            });
+
+            clearBtn.addEventListener('click',(e)=>{ e.preventDefault(); clearAll(); });
+
+            exportBtn.addEventListener('click', ()=>{
+                const data = JSON.stringify(transactions, null, 2);
+                const blob = new Blob([data], {type:'application/json'});
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a'); a.href = url; a.download = 'transactions.json'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+            });
+
+            importBtn.addEventListener('click', ()=> fileInput.click());
+            fileInput.addEventListener('change', async(e)=>{
+                const f = e.target.files && e.target.files[0];
+                if(!f) return;
+                try{
+                    const text = await f.text();
+                    const imported = JSON.parse(text);
+                    if(Array.isArray(imported)){
+                        // merge but avoid duplicate ids
+                        const ids = new Set(transactions.map(t=>t.id));
+                        for(const it of imported){
+                            if(!ids.has(it.id)) transactions.push(it);
+                        }
+                        saveTransactions(); render();
+                        alert('Import successful');
+                    } else alert('Invalid file format — expected an array of transactions');
+                }catch(err){alert('Failed to import: '+err.message)}
+                fileInput.value = '';
+            });
+
+            // initialize canvas size for hi-dpi
+            function resizeCanvas(){
+                const ctx = donut.getContext('2d');
+                const ratio = window.devicePixelRatio || 1;
+                const w = donut.clientWidth;
+                const h = donut.clientHeight || 200;
+                donut.width = Math.round(w * ratio);
+                donut.height = Math.round(h * ratio);
+                donut.style.height = h + 'px';
+                ctx.scale(ratio, ratio);
+            }
+
+            window.addEventListener('resize', ()=>{ resizeCanvas(); render(); });
+
+            // initial render
+            resizeCanvas(); render();
+        </script>
+    </body>
+</html>
